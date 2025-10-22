@@ -1,53 +1,79 @@
 workflows:
   build_dia_register_release:
-    name: Build DIA Register (Optimized)
+    name: Build DIA Register (APK + AAB)
     max_build_duration: 60
     environment:
       flutter: stable
       vars:
         ZIP_FILE: "dia_register_fixed.zip"
-        UNZIP_DIR: "project_unzipped"
+        UNZIP_DIR: "unzipped_project"
 
     scripts:
-      # 1️⃣ Unzip your uploaded Flutter project
+      # 1️⃣ Unzip the uploaded Flutter project
       - name: Extract project
         script: |
           echo "📦 Extracting Flutter project..."
           rm -rf $UNZIP_DIR
+          mkdir -p $UNZIP_DIR
           unzip -q "$ZIP_FILE" -d "$UNZIP_DIR"
-          cd "$UNZIP_DIR"
-          echo "✅ Extraction complete. Current directory:"
-          pwd
-          ls -la
+          echo "✅ Extraction complete. Folder structure:"
+          ls -R $UNZIP_DIR
 
-      # 2️⃣ Install dependencies
+      # 2️⃣ Auto-detect folder containing pubspec.yaml
+      - name: Locate Flutter project folder
+        script: |
+          echo "🔍 Searching for pubspec.yaml..."
+          export PROJECT_DIR=$(find $UNZIP_DIR -type f -name "pubspec.yaml" -exec dirname {} \; | head -n 1)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "❌ No Flutter project found!"; exit 1
+          fi
+          echo "✅ Found Flutter project at: $PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $CM_ENV_PATH
+
+      # 3️⃣ Install dependencies
       - name: Install Flutter dependencies
         script: |
           echo "🚀 Running flutter pub get..."
+          cd "$PROJECT_DIR"
           flutter pub get
+          echo "✅ Dependencies installed."
 
-      # 3️⃣ Build optimized release APK
-      - name: Build Android APK (optimized)
+      # 4️⃣ Build release APKs
+      - name: Build Android APKs (optimized)
         script: |
-          echo "🏗️ Building optimized DIA Register release..."
+          cd "$PROJECT_DIR"
+          echo "🏗️ Building release APK..."
           flutter build apk --release \
             --split-per-abi \
             --obfuscate \
             --split-debug-info=build/debug_info
-          echo "✅ Build complete."
+          echo "✅ APK build complete."
 
-      # 4️⃣ Move all generated APKs to output folder
-      - name: Move APKs to output
+      # 5️⃣ Build release AAB
+      - name: Build Android App Bundle (AAB)
         script: |
-          echo "📂 Moving built APKs..."
-          mkdir -p ../build_outputs
-          cp build/app/outputs/flutter-apk/*.apk ../build_outputs/
-          echo "✅ APKs ready in build_outputs directory."
+          cd "$PROJECT_DIR"
+          echo "🏗️ Building release AAB..."
+          flutter build appbundle --release \
+            --obfuscate \
+            --split-debug-info=build/debug_info
+          echo "✅ AAB build complete."
+
+      # 6️⃣ Collect build outputs
+      - name: Move artifacts
+        script: |
+          echo "📦 Collecting all build outputs..."
+          mkdir -p build_outputs
+          cp $PROJECT_DIR/build/app/outputs/flutter-apk/*.apk build_outputs/ || true
+          cp $PROJECT_DIR/build/app/outputs/bundle/release/*.aab build_outputs/ || true
+          echo "✅ All artifacts moved to build_outputs folder."
 
     artifacts:
       - build_outputs/*.apk
+      - build_outputs/*.aab
 
     publishing:
       email:
         recipients:
           - your@email.com
+
