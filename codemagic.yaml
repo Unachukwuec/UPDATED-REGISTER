@@ -19,7 +19,7 @@ workflows:
           echo "✅ Extraction complete. Folder structure:"
           ls -R $UNZIP_DIR
 
-      # 2️⃣ Auto-detect folder containing pubspec.yaml
+      # 2️⃣ Auto-detect folder containing pubspec.yaml (FIXED)
       - name: Locate Flutter project folder
         script: |
           echo "🔍 Searching for pubspec.yaml..."
@@ -28,9 +28,15 @@ workflows:
             echo "❌ No Flutter project found!"; exit 1
           fi
           echo "✅ Found Flutter project at: $PROJECT_DIR"
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $CM_ENV_PATH
 
-      # 3️⃣ Install dependencies
+          # Safely persist PROJECT_DIR for later steps
+          if [ -n "$CM_ENV_PATH" ] && [ -f "$CM_ENV_PATH" ]; then
+            echo "PROJECT_DIR=$PROJECT_DIR" >> "$CM_ENV_PATH"
+          else
+            echo "PROJECT_DIR=$PROJECT_DIR" >> "$CM_BUILD_DIR/env_vars"
+          fi
+
+      # 3️⃣ Install Flutter dependencies
       - name: Install Flutter dependencies
         script: |
           echo "🚀 Running flutter pub get..."
@@ -76,4 +82,5 @@ workflows:
       email:
         recipients:
           - your@email.com
+
 
