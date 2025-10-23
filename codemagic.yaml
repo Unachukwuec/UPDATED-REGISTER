@@ -38,13 +38,23 @@ workflows:
           flutter pub get
           echo "✅ Dependencies installed."
 
-      # 4️⃣ Build APK (Universal)
-      - name: Build release APK
+       # 2️⃣ Locate pubspec.yaml
+      - name: Locate Flutter project folder
         script: |
-          cd "$PROJECT_DIR"
-          echo "🏗️ Building release APK..."
-          flutter build apk --release --no-split-per-abi
-          echo "✅ APK build complete."
+          echo "🔍 Searching for pubspec.yaml..."
+          export PROJECT_DIR=$(find $UNZIP_DIR -type f -name "pubspec.yaml" -exec dirname {} \; | head -n 1)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "❌ No Flutter project found!"; exit 1
+          fi
+          echo "✅ Found Flutter project at: $PROJECT_DIR"
+
+          # Safely store PROJECT_DIR for next steps
+          if [ -z "$CM_ENV_PATH" ]; then
+            echo "⚙️ CM_ENV_PATH not set — using fallback path."
+            CM_ENV_PATH="/tmp/env_vars.txt"
+          fi
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$CM_ENV_PATH"
+
 
       # 5️⃣ Build AAB (Play Store)
       - name: Build release AAB
